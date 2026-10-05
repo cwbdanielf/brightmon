@@ -13,32 +13,31 @@ export default function MonitorFeatures(props) {
     let extraHTML = []
 
     if (monitor.featuresPending) {
-        extraHTML.push(<div className="description" style={{padding: "8px 0"}} key="features-pending">Detecting display features…</div>)
+        extraHTML.push(<div className="description" style={{padding: "8px 0"}} key="features-pending">{T.t("SETTINGS_FEATURES_DETECTING")}</div>)
     }
 
     if (monitor.featuresRefreshing) {
-        extraHTML.push(<div className="description" style={{padding: "8px 0"}} key="features-refreshing">Refreshing display features…</div>)
+        extraHTML.push(<div className="description" style={{padding: "8px 0"}} key="features-refreshing">{T.t("SETTINGS_FEATURES_REFRESHING")}</div>)
     }
 
-    const inputsData = {
-        1: "VGA-1",
-        2: "VGA-2",
-        3: "DVI-1",
-        4: "DVI-2",
-        5: "Composite video 1",
-        6: "Composite video 2",
-        7: "S-Video-1",
-        8: "S-Video-2",
-        9: "Tuner-1",
-        10: "Tuner-2",
-        11: "Tuner-3",
-        12: "Component video (YPrPb/YCrCb) 1",
-        13: "Component video (YPrPb/YCrCb) 2",
-        14: "Component video (YPrPb/YCrCb) 3",
-        15: "DisplayPort-1",
-        16: "DisplayPort-2",
-        17: "HDMI-1",
-        18: "HDMI-2"
+    const inputLabel = (code) => {
+        if (code === 5 || code === 6) return `${T.t("SETTINGS_FEATURES_INPUT_COMPOSITE")} ${code - 4}`
+        if (code >= 12 && code <= 14) return `${T.t("SETTINGS_FEATURES_INPUT_COMPONENT")} (YPrPb/YCrCb) ${code - 11}`
+        return ({
+            1: "VGA-1",
+            2: "VGA-2",
+            3: "DVI-1",
+            4: "DVI-2",
+            7: "S-Video-1",
+            8: "S-Video-2",
+            9: "Tuner-1",
+            10: "Tuner-2",
+            11: "Tuner-3",
+            15: "DisplayPort-1",
+            16: "DisplayPort-2",
+            17: "HDMI-1",
+            18: "HDMI-2"
+        })[code] || ""
     }
 
     // Keep the custom brightness VCP override available when feature detection
@@ -101,7 +100,7 @@ export default function MonitorFeatures(props) {
                         <>
                             <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
                                 {(Array.isArray(monitor.features["0x60"][1]) ? monitor.features["0x60"][1] : [])?.map(e =>
-                                    <div key={e + monitor.id} className="button" style={{ color: monitor.features[vcp] === e ? "red" : '' }} disabled={monitor.features[vcp] === e}>{inputsData[e]}</div>
+                                    <div key={e + monitor.id} className="button" style={{ color: monitor.features[vcp] === e ? "red" : '' }} disabled={monitor.features[vcp] === e}>{inputLabel(e)}</div>
                                 )}
                             </div>
                             <div style={{ marginTop: "10px" }}>
@@ -142,7 +141,7 @@ export default function MonitorFeatures(props) {
             if (ignoreCodes.indexOf(vcp) === -1 && monitorFeatures[vcp] !== undefined) {
                 const settings = window.settings?.monitorFeaturesSettings?.[monitor?.hwid[1]]?.[vcp]
                 const enabled = monitorFeatures?.[vcp];
-                const name = (settings?.iconType === "text" && settings?.iconText?.length ? settings.iconText : "Custom Feature")
+                const name = (settings?.iconType === "text" && settings?.iconText?.length ? settings.iconText : T.t("SETTINGS_FEATURES_CUSTOM"))
                 const icon = (settings?.iconType === "windows" && settings?.icon ? settings.icon : "E9E9")
                 extraHTML.push(
                     <SettingsOption className="monitor-feature-item" key={vcp} icon={icon} title={`${name} (${vcp})`} expandable={true} input={
@@ -161,7 +160,7 @@ export default function MonitorFeatures(props) {
             const list = []
             for (const code in monitor.vcpCodes) {
                 list.push(
-                    <div className="vcp-code" key={code}><b>{code}</b>: {findVCPCodeName(code) || "???"}
+                    <div className="vcp-code" key={code}><b>{code}</b>: {findVCPCodeName(code) || T.t("SETTINGS_FEATURES_UNKNOWN_CODE")}
                         {
                             monitor.vcpCodes[code].length
                                 ? <div className="supported-values">{T.t("SETTINGS_FEATURES_VCP_EXPECTED")}: {monitor.vcpCodes[code].toString()}</div>
@@ -191,7 +190,7 @@ export default function MonitorFeatures(props) {
         )
 
     } else if (monitor.type === "studio-display") {
-        extraHTML.push(<p key="studio-display">Brightness is available for this Studio Display from the brightness panel. DDC/CI features are not supported.</p>)
+        extraHTML.push(<p key="studio-display">{T.t("SETTINGS_FEATURES_STUDIO_DISPLAY_DESC")}</p>)
     } else {
         extraHTML.push(<p key="none">{T.t("SETTINGS_FEATURES_UNSUPPORTED")}</p>)
     }

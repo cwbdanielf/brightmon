@@ -42,6 +42,8 @@ window.addEventListener('load', () => {
 
 // Localization recieved
 ipc.on('localization-updated', (event, localization) => {
+    document.documentElement.lang = localization.detected || "en"
+    document.title = localization.desired?.INTRO_TITLE || localization.default?.INTRO_TITLE || "BrightMon"
     window.dispatchEvent(new CustomEvent('localizationUpdated', {
         detail: localization
     }))

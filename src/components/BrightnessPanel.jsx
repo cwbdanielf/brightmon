@@ -15,9 +15,7 @@ const BrightnessPanel = memo(function BrightnessPanel() {
     hideDisplays: window.settings?.hideDisplays || {},
     linkedLevelsActive: false,
     names: {},
-    update: false,
     sleeping: false,
-    updateProgress: 0,
     isRefreshing: window.isRefreshing
   })
   const [doBackgroundEvent, setDoBackgroundEvent] = useState(false)
@@ -132,11 +130,6 @@ const BrightnessPanel = memo(function BrightnessPanel() {
     setDoBackgroundEvent(true)
   }
 
-  const recievedUpdate = (e) => {
-    const update = e.detail
-    setState(prev => ({ ...prev, update }))
-  }
-
   const recievedSleep = (e) => {
     setState(prev => ({ ...prev, sleeping: e.detail }))
   }
@@ -167,7 +160,6 @@ const BrightnessPanel = memo(function BrightnessPanel() {
   }
 
   const handleIsRefreshingUpdate = (e) => setState(prev => ({ ...prev, isRefreshing: e.detail }))
-  const handleUpdateProgress = (e) => setState(prev => ({ ...prev, updateProgress: e.detail.progress }))
 
   useEffect(() => {
     resetBrightnessInterval()
@@ -184,21 +176,14 @@ const BrightnessPanel = memo(function BrightnessPanel() {
       T.setLocalizationData(e.detail.desired, e.detail.default)
       setLocalizationVersion(version => version + 1)
     }
-    const handleUpdateUpdated = (e) => recievedUpdate(e)
     const handleSleepUpdated = (e) => recievedSleep(e)
     const handleRefreshingUpdated = (e) => handleIsRefreshingUpdate(e)
-    const handleProgressUpdated = (e) => handleUpdateProgress(e)
 
     window.addEventListener("monitorsUpdated", handleMonitorsUpdated)
     window.addEventListener("settingsUpdated", handleSettingsUpdated)
     window.addEventListener("localizationUpdated", handleLocalizationUpdated)
-    window.addEventListener("updateUpdated", handleUpdateUpdated)
     window.addEventListener("sleepUpdated", handleSleepUpdated)
     window.addEventListener("isRefreshing", handleRefreshingUpdated)
-
-    if (window.isAppX === false) {
-      window.addEventListener("updateProgress", handleProgressUpdated)
-    }
 
     // Update brightness every interval, if changed
     window.requestSettings()
@@ -210,10 +195,8 @@ const BrightnessPanel = memo(function BrightnessPanel() {
       window.removeEventListener("monitorsUpdated", handleMonitorsUpdated)
       window.removeEventListener("settingsUpdated", handleSettingsUpdated)
       window.removeEventListener("localizationUpdated", handleLocalizationUpdated)
-      window.removeEventListener("updateUpdated", handleUpdateUpdated)
       window.removeEventListener("sleepUpdated", handleSleepUpdated)
       window.removeEventListener("isRefreshing", handleRefreshingUpdated)
-      window.removeEventListener("updateProgress", handleProgressUpdated)
     }
   }, [])
 
@@ -358,7 +341,7 @@ const BrightnessPanel = memo(function BrightnessPanel() {
                         <Slider id={monitor.id} level={monitor.brightness} min={0} max={100} num={monitor.num} monitortype={monitor.type} hwid={monitor.key} key={monitor.key} onChange={handleChange} scrollAmount={window.settings?.scrollFlyoutAmount} />
                       </div>
                     )}
-                    <DDCCISliders monitor={monitor} monitorFeatures={monitorFeatures} scrollAmount={window.settings?.scrollFlyoutAmount} />
+                    <DDCCISliders monitor={monitor} monitorFeatures={monitorFeatures} T={T} scrollAmount={window.settings?.scrollFlyoutAmount} />
                     {showHDRSliders ? <HDRSliders monitor={monitor} scrollAmount={window.settings?.scrollFlyoutAmount} /> : null}
                   </div>
                 )
@@ -398,38 +381,6 @@ const BrightnessPanel = memo(function BrightnessPanel() {
         </div>
       </div>
       {state.sleeping ? (<div></div>) : getMonitors()}
-      {
-        (state.update && state.update.show)
-          ?
-          <div className="updateBar">
-            <div className="left">
-              {T.t("PANEL_UPDATE_AVAILABLE")}
-              ({state.update.version})
-            </div>
-            <div className="right">
-              <a onClick={window.installUpdate}>
-                {T.t("GENERIC_INSTALL")}
-              </a>
-              <a className="icon" title={T.t("GENERIC_DISMISS")} onClick={window.dismissUpdate}>
-                &#xEF2C;
-              </a>
-            </div>
-          </div>
-          :
-          (state.update && state.update.downloading)
-          &&
-          <div className="updateBar">
-            <div className="left progress">
-              <div className="progress-bar">
-                <div style={{ width: `${state.updateProgress}%` }}>
-                </div>
-              </div>
-            </div>
-            <div className="right">
-              {state.updateProgress}%
-            </div>
-          </div>
-      }
       <div id="mica">
         <div className="displays" style={{ visibility: window.micaState.visibility }}>
           <div className="blur">

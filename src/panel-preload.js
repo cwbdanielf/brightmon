@@ -176,15 +176,6 @@ function turnOffDisplays() {
     }, 111)
 }
 
-function installUpdate() {
-    ipc.send('get-update', window.latestVersion)
-    ipc.send('clear-update', window.latestVersion.version)
-}
-
-function dismissUpdate() {
-    ipc.send('ignore-update', window.latestVersion.version)
-}
-
 // Tray icon clicked
 ipc.on('tray-clicked', () => {
     window.document.getElementById("root").dataset["sleep"] = false
@@ -273,26 +264,19 @@ ipc.on('settings-updated', (event, settings) => {
 
 // Localization recieved
 ipc.on('localization-updated', (event, localization) => {
+    window.localization = localization
+    document.documentElement.lang = localization.detected || "en"
+    document.title = localization.desired?.PANEL_TITLE || localization.default?.PANEL_TITLE || "BrightMon"
     window.dispatchEvent(new CustomEvent('localizationUpdated', {
         detail: localization
     }))
 })
 
-// New app update recieved
-ipc.on('latest-version', (event, version) => {
-    window.latestVersion = version
-    window.dispatchEvent(new CustomEvent('updateUpdated', {
-        detail: version
-    }))
-})
-
-// Update download progress
-ipc.on('updateProgress', (event, progress) => {
-    window.dispatchEvent(new CustomEvent('updateProgress', {
-        detail: {
-            progress
-        }
-    }))
+window.addEventListener('DOMContentLoaded', () => {
+    const localization = window.localization
+    if (!localization) return
+    document.documentElement.lang = localization.detected || "en"
+    document.title = localization.desired?.PANEL_TITLE || localization.default?.PANEL_TITLE || "BrightMon"
 })
 
 // Updated window position variable
@@ -435,8 +419,6 @@ window.openSettings = openSettings
 window.sendSettings = sendSettings
 window.requestSettings = requestSettings
 window.pauseMonitorUpdates = pauseMonitorUpdates
-window.installUpdate = installUpdate
-window.dismissUpdate = dismissUpdate
 window.sendHeight = sendHeight
 window.panelAnimationDone = panelAnimationDone
 window.setPanelVisibility = setPanelVisibility

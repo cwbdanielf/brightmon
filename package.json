@@ -1,6 +1,6 @@
 {
-  "name": "twinkle-tray",
-  "version": "1.18.0-beta2",
+  "name": "brightmon",
+  "version": "1.0.1",
   "description": "Manage the brightness of monitors from your system tray",
   "main": "src/electron.js",
   "scripts": {
@@ -35,7 +35,6 @@
     "@paymoapp/active-window": "file:src/modules/node-active-window",
     "acrylic": "file:src/modules/acrylic",
     "color": "^4.2.3",
-    "ga4-mp": "^1.0.3",
     "global-mouse-events": "^1.2.0",
     "markdown-to-jsx": "^7.5.0",
     "stackblur-canvas": "^2.7.0",
@@ -54,8 +53,8 @@
     "native-reg": "^1.1.1"
   },
   "build": {
-    "productName": "Twinkle Tray",
-    "appId": "com.xanderfrangos.twinkle-tray",
+    "productName": "BrightMon",
+    "appId": "com.brightmon.desktop",
     "compression": "normal",
     "electronLanguages": ["en-US"],
     "afterPack": "resources/afterPack.js",
@@ -192,6 +191,8 @@
       "customExtensionsPath": "resources/appx/extensions.xml"
     },
     "nsis": {
+      "oneClick": true,
+      "perMachine": false,
       "deleteAppDataOnUninstall": true,
       "include": "resources/nsis/installer.nsh",
       "warningsAsErrors": false

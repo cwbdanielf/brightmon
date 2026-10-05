@@ -106,37 +106,11 @@ function openURL(url) {
     ipc.send('open-url', url)
 }
 
-function getUpdate() {
-    ipc.send('get-update', window.latestVersion)
-    ipc.send('clear-update', window.latestVersion.version)
-}
-
-function checkForUpdates() {
-    ipc.send('check-for-updates')
-}
-
 window.reloadReactMonitors = function() { 
     window.dispatchEvent(new CustomEvent('monitorsUpdated', {
         detail: window.allMonitors
     }))
 }
-
-// New app update recieved
-ipc.on('latest-version', (event, version) => {
-    window.latestVersion = version
-    window.dispatchEvent(new CustomEvent('updateUpdated', {
-        detail: version
-    }))
-})
-
-// Update download progress
-ipc.on('updateProgress', (event, progress) => {
-    window.dispatchEvent(new CustomEvent('updateProgress', {
-        detail: {
-            progress
-        }
-    }))
-})
 
 // Monitor info updated
 ipc.on("monitors-updated", (e, monitors) => {
@@ -196,6 +170,8 @@ ipc.on('window-history', (event, history) => {
 
 // Localization recieved
 ipc.on('localization-updated', (event, localization) => {
+    document.documentElement.lang = localization.detected || "en"
+    document.title = localization.desired?.SETTINGS_TITLE || localization.default?.SETTINGS_TITLE || "BrightMon"
     window.dispatchEvent(new CustomEvent('localizationUpdated', {
         detail: localization
     }))
@@ -282,8 +258,6 @@ window.requestSettings = requestSettings
 window.resetSettings = resetSettings
 window.requestDDCSafetyStatus = requestDDCSafetyStatus
 window.retryDDCValidation = retryDDCValidation
-window.getUpdate = getUpdate
-window.checkForUpdates = checkForUpdates
 window.openURL = openURL
 window.allMonitors = []
 window.lastUpdate = Date.now()

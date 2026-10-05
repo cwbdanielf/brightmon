@@ -3,7 +3,7 @@ import { useObject } from "../hooks/useObject"
 import Slider from "./Slider"
 
 export default function DDCCISliders(props) {
-    const { monitor, monitorFeatures } = props
+    const { monitor, monitorFeatures, T } = props
 
     const defaultValues = {}
 
@@ -19,16 +19,16 @@ export default function DDCCISliders(props) {
         2: "VGA-2",
         3: "DVI-1",
         4: "DVI-2",
-        5: "Composite video 1",
-        6: "Composite video 2",
+        5: `${T.t("SETTINGS_FEATURES_INPUT_COMPOSITE")} 1`,
+        6: `${T.t("SETTINGS_FEATURES_INPUT_COMPOSITE")} 2`,
         7: "S-Video-1",
         8: "S-Video-2",
         9: "Tuner-1",
         10: "Tuner-2",
         11: "Tuner-3",
-        12: "Component video (YPrPb/YCrCb) 1",
-        13: "Component video (YPrPb/YCrCb) 2",
-        14: "Component video (YPrPb/YCrCb) 3",
+        12: `${T.t("SETTINGS_FEATURES_INPUT_COMPONENT")} (YPrPb/YCrCb) 1`,
+        13: `${T.t("SETTINGS_FEATURES_INPUT_COMPONENT")} (YPrPb/YCrCb) 2`,
+        14: `${T.t("SETTINGS_FEATURES_INPUT_COMPONENT")} (YPrPb/YCrCb) 3`,
         15: "DisplayPort-1",
         16: "DisplayPort-2",
         17: "HDMI-1",

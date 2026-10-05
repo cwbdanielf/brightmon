@@ -34,7 +34,7 @@ if (!singleInstanceLock) {
   // Tee console output into the session log file. In non-dev (without --console),
   // console.log stays quiet on stdout but is still collected to the file.
   logger.patchConsole({ tag: "MAIN", mirrorLog: (isDev || app.commandLine.hasSwitch("console")) })
-  console.log("Starting Twinkle Tray...")
+  console.log("Starting BrightMon...")
   app.on('second-instance', handleCommandLine)
 }
 
@@ -58,7 +58,6 @@ process.on("unhandledRejection", (reason) => {
   console.error("UNHANDLED REJECTION:", reason)
 })
 
-const { Readable } = require("node:stream")
 //require("os").setPriority(0, require("os").constants.priority.PRIORITY_BELOW_NORMAL)
 const { BrowserWindow, nativeTheme, systemPreferences, Menu, ipcMain, screen, globalShortcut, powerMonitor } = require('electron')
 const uuid = require('crypto').randomUUID
@@ -110,7 +109,6 @@ app.allowRendererProcessReuse = true
 
 // Logging
 const logPath = path.join(configFilesDir, `\\debug${(isDev ? "-dev" : "")}.log`)
-const updatePath = path.join(configFilesDir, `\\update.exe`)
 
 // Remove old log
 if (fs.existsSync(logPath)) {
@@ -462,9 +460,9 @@ function recoverMonitorThread(thread, error) {
   if (!monitorsThreadFailed) {
     monitorsThreadFailed = true
     require('electron').dialog.showMessageBox(null, {
-      title: 'Monitors thread failed',
-      message: 'The monitors thread failed with the following message:',
-      detail: error?.message || error?.toString() || 'Unknown error',
+      title: T.t("ELECTRON_MONITORS_THREAD_FAILED"),
+      message: T.t("ELECTRON_MONITORS_THREAD_FAILED_DESC"),
+      detail: error?.message || error?.toString() || T.t("ELECTRON_UNKNOWN_ERROR"),
     }, () => { })
   }
 
@@ -810,35 +808,6 @@ function willPauseMouseEvents(time = 10000) {
 
 
 
-// Analytics
-let analyticsInterval = false
-let analyticsFrequency = 1000 * 60 * 29 // 29 minutes
-let lastAnalyticsPing = 0
-
-function pingAnalytics() {
-  // Skip if too recent
-  if (Date.now() < lastAnalyticsPing + (1000 * 60 * 28)) return false;
-
-  const analytics = require('ga4-mp').createClient("Y1YTliQdTL-moveI0z1TLA", "G-BQ22ZK4BPY", settings.uuid)
-  console.log("\x1b[34mAnalytics:\x1b[0m sending with UUID " + settings.uuid)
-
-  let events = []
-  events.push({
-    name: "page_view",
-    params: {
-      page_location: app.name + "/" + "v" + appVersion + "/" + (appBuild ? appBuild : ""),
-      page_title: app.name + "/" + "v" + appVersion,
-      page_referrer: app.name,
-      os_version: require("os").release(),
-      app_type: app.name,
-      app_version: appVersion,
-      engagement_time_msec: 1
-    }
-  })
-  analytics.send(events)
-  lastAnalyticsPing = Date.now()
-}
-
 let monitors = {}
 let mainWindow;
 let tray = null
@@ -904,11 +873,9 @@ const defaultSettings = {
   extendMinimumBreakpoints: {},
   sdrAsMainSliderDisplays: {},
   sdrAsMainSlider: false,
-  checkForUpdates: !isDev,
   dismissedUpdate: '',
-  language: "system",
+  language: "pt-BR",
   names: {},
-  analytics: !isDev,
   scrollShortcut: true,
   scrollShortcutAmount: 2,
   scrollFlyoutAmount: 2,
@@ -1274,6 +1241,9 @@ function processSettings(newSettings = {}, sendUpdate = true) {
     if (newSettings.language !== undefined) {
       getLocalization()
       rebuildTray = true
+      mainWindow?.setTitle(T.t("ELECTRON_WINDOW_PANEL"))
+      introWindow?.setTitle(T.t("INTRO_TITLE"))
+      settingsWindow?.setTitle(T.t("ELECTRON_WINDOW_SETTINGS"))
     }
 
     if (newSettings.monitorFeatures !== undefined) {
@@ -1366,15 +1336,6 @@ function processSettings(newSettings = {}, sendUpdate = true) {
       }
     }
 
-    if (newSettings.checkForUpdates !== undefined) {
-      if (newSettings.checkForUpdates === false) {
-        latestVersion = false
-        sendToAllWindows('latest-version', latestVersion);
-      } else {
-        lastCheck = false
-      }
-    }
-
     if (newSettings.isDev === true || newSettings.isDev === false) {
       rebuildTray = true
     }
@@ -1410,26 +1371,8 @@ function processSettings(newSettings = {}, sendUpdate = true) {
       }
     }
 
-    if (newSettings.branch) {
-      lastCheck = false
-      settings.dismissedUpdate = false
-      checkForUpdates()
-    }
     if (newSettings.lightSensor) {
       lightSensor.changeSettings(newSettings.lightSensor);
-    }
-
-    if (settings.analytics) {
-      pingAnalytics()
-      if (analyticsInterval) {
-        clearInterval(analyticsInterval)
-      }
-      analyticsInterval = setInterval(pingAnalytics, analyticsFrequency)
-    } else {
-      analytics = false
-      if (analyticsInterval) {
-        clearInterval(analyticsInterval)
-      }
     }
 
     if (rebuildTray) {
@@ -2194,9 +2137,9 @@ async function updateStartupOption(openAtLogin) {
     */
 
     if(openAtLogin) {
-      enableStartup('electron.app.Twinkle Tray', app.getPath('exe'))
+      enableStartup('electron.app.BrightMon', app.getPath('exe'))
     } else {
-      disableStartup('electron.app.Twinkle Tray')
+      disableStartup('electron.app.BrightMon')
     }
   }
 
@@ -2271,6 +2214,14 @@ function getLocalization() {
 
   T = new Translate(localization.desired, localization.default)
   sendToAllWindows("localization-updated", localization)
+
+  if (tray) {
+    setTrayMenu()
+    setTrayToolTip()
+  }
+  mainWindow?.setTitle(T.t("ELECTRON_WINDOW_PANEL"))
+  introWindow?.setTitle(T.t("INTRO_TITLE"))
+  settingsWindow?.setTitle(T.t("ELECTRON_WINDOW_SETTINGS"))
 
   if(monitorsThreadReady) {
     monitorsThread.send({
@@ -3638,11 +3589,6 @@ ipcMain.on('open-url', (event, url) => {
   }
 })
 
-ipcMain.on('get-update', (event, version) => {
-  latestVersion.error = false
-  getLatestUpdate(version)
-})
-
 ipcMain.on('panel-height', (event, height) => {
   if (panelState === "overlay") return;
   panelSize.height = height + (settings?.isWin11 ? 24 : 0)
@@ -3703,8 +3649,8 @@ ipcMain.on('save-report', async () => {
 
     monitorsThread.once("getReport", data => {
       require('electron').dialog.showSaveDialog({
-        title: "Save report",
-        buttonLabel: 'Save file',
+        title: T.t("ELECTRON_SAVE_REPORT"),
+        buttonLabel: T.t("ELECTRON_SAVE_FILE"),
         defaultPath: app.getPath("desktop") + `\\tt-report-${Date.now()}.txt`,
         filters: [{
           name: ".txt",
@@ -3750,7 +3696,7 @@ function createPanel(toggleOnLoad = false, isRefreshing = false, showOnLoad = tr
     skipTaskbar: true,
     resizable: false,
     type: "toolbar",
-    title: "Twinkle Tray Flyout",
+    title: T.t("ELECTRON_WINDOW_PANEL"),
     maximizable: false,
     minimizable: false,
     webPreferences: {
@@ -4554,7 +4500,7 @@ function createTray() {
 
   const { Tray } = require('electron')
   tray = new Tray(getTrayIconPath())
-  tray.setToolTip('Twinkle Tray' + (isDev ? " (Dev)" : ""))
+  setTrayToolTip()
   setTrayMenu()
   tray.on("click", async () => toggleTray(true))
 
@@ -4662,6 +4608,12 @@ function getDebugTrayMenuItems() {
   }
 }
 
+function setTrayToolTip(averagePerc = null) {
+  const devLabel = isDev ? ` (${T.t("ELECTRON_DEV_LABEL")})` : ""
+  const percentage = (averagePerc === null ? "" : ` (${averagePerc}%)`)
+  tray?.setToolTip(`${T.t("ELECTRON_APP_NAME")}${devLabel}${percentage}`)
+}
+
 function setTrayPercent() {
   try {
     if (tray) {
@@ -4675,7 +4627,7 @@ function setTrayPercent() {
       }
       if (i > 0) {
         averagePerc = Math.round(averagePerc / i)
-        tray.setToolTip('Twinkle Tray' + (isDev ? " (Dev)" : "") + ' (' + averagePerc + '%)')
+        setTrayToolTip(averagePerc)
       }
     }
   } catch (e) {
@@ -4715,7 +4667,6 @@ const toggleTray = async (doRefresh = true, isOverlay = false) => {
 
     // Send accent
     sendToAllWindows('update-colors', getAccentColors())
-    if (latestVersion) sendToAllWindows('latest-version', latestVersion);
   }
 
   if (mainWindow) {
@@ -4734,6 +4685,7 @@ const toggleTray = async (doRefresh = true, isOverlay = false) => {
       }
       sendMicaWallpaper()
       sendToAllWindows("display-mode", "normal")
+      sendToAllWindows("request-localization")
       showPanel(true, panelSize.height)
       panelState = "visible"
       mainWindow.focus()
@@ -4782,7 +4734,7 @@ function showIntro() {
     frame: false,
     transparent: true,
     icon: './src/assets/logo.ico',
-    title: "Twinkle Tray",
+    title: "BrightMon",
     webPreferences: {
       preload: path.join(__dirname, 'intro-preload.js'),
       devTools: settings.isDev,
@@ -4857,7 +4809,7 @@ function createSettings() {
     frame: false,
     backgroundMaterial: (isReallyWin11_22H2 && settings.isWin11 && settings.useAcrylic ? "mica" : "none"),
     icon: './src/assets/logo.ico',
-    title: "Twinkle Tray Settings",
+    title: T.t("ELECTRON_WINDOW_SETTINGS"),
     webPreferences: {
       preload: path.join(__dirname, 'settings-preload.js'),
       devTools: settings.isDev,
@@ -4978,190 +4930,6 @@ ipcMain.on("windowClose", e => {
 
 
 
-let latestVersion = false
-let lastCheck = false
-checkForUpdates = async (force = false) => {
-  if (!force) {
-    if (!settings.checkForUpdates) return false;
-    if (lastCheck && lastCheck == new Date().getDate()) return false;
-  }
-  if (isPortable || isAppX) return false;
-  lastCheck = new Date().getDate()
-  try {
-    if (isAppX === false) {
-      console.log("Checking for updates...")
-      fetch("https://api.github.com/repos/xanderfrangos/twinkle-tray/releases").then((response) => {
-        response.json().then((releases) => {
-          let foundVersion = false
-          for (let release of releases) {
-            if (!(settings.branch === "master" && release.prerelease === true)) {
-
-              // Skip versions older than current
-              const versionParsed =  Utils.getVersionValue(release.tag_name)
-              const appVersionValue = Utils.getVersionValue(`v${app.getVersion()}`)
-              if(versionParsed < appVersionValue) continue;
-
-              foundVersion = true
-              latestVersion = {
-                releaseURL: (release.html_url),
-                version: release.tag_name,
-                downloadURL: release.assets[0]["browser_download_url"],
-                filesize: release.assets[0]["size"],
-                changelog: release.body,
-                show: false,
-                error: false
-              }
-              console.log("Found version: " + latestVersion.version)
-              break
-            }
-          }
-
-          if (foundVersion && "v" + appVersion != latestVersion.version && (settings.dismissedUpdate != latestVersion.version || force)) {
-            if (!force) latestVersion.show = true
-            console.log("Sending new version to windows.")
-            sendToAllWindows('latest-version', latestVersion)
-          }
-
-        })
-      });
-    }
-  } catch (e) {
-    console.log(e)
-  }
-}
-
-
-getLatestUpdate = async (version) => {
-  try {
-    console.log("Downloading update from: " + version.downloadURL)
-    const fs = require('fs');
-
-    latestVersion.downloading = true
-    sendToAllWindows('latest-version', latestVersion)
-
-    // Remove old update
-    if (fs.existsSync(updatePath)) {
-      try {
-        fs.unlinkSync(updatePath)
-      } catch (e) {
-        console.log("Couldn't delete old update file")
-      }
-    }
-
-    const update = await fetch(version.downloadURL)
-    if (!update.ok || !update.body) {
-      throw new Error(`Update download failed with HTTP ${update.status}`)
-    }
-
-    console.log("Downloading...!")
-    const readableNodeStream = Readable.fromWeb(update.body)
-    const dest = fs.createWriteStream(updatePath)
-    let size = 0
-    let lastSizeUpdate = 0
-
-    readableNodeStream.on('data', (chunk) => {
-      size += chunk.length
-      if (size >= lastSizeUpdate + (version.filesize * 0.01) || lastSizeUpdate === 0 || size === version.filesize) {
-        lastSizeUpdate = size
-        sendToAllWindows('updateProgress', Math.floor((size / version.filesize) * 100))
-        console.log(`Downloaded ${size / 1000}KB. [${Math.floor((size / version.filesize) * 100)}%]`)
-      }
-    })
-
-    await new Promise((resolve, reject) => {
-      readableNodeStream.once('error', reject)
-      dest.once('error', reject)
-      dest.once('finish', resolve)
-      readableNodeStream.pipe(dest)
-    })
-
-    if (size !== version.filesize) {
-      throw new Error(`Update download was incomplete. Expected ${version.filesize} bytes, got ${size}`)
-    }
-
-    console.log("Saved! Running...")
-    setTimeout(() => {
-      runUpdate(version.filesize)
-    }, 1250)
-
-  } catch (e) {
-    console.log("Couldn't download update!", e)
-    latestVersion.show = true
-    latestVersion.downloading = false
-    sendToAllWindows('latest-version', latestVersion)
-  }
-}
-
-function runUpdate(expectedSize = false) {
-  try {
-
-    if (!fs.existsSync(updatePath)) {
-      throw ("Update file doesn't exist!")
-    }
-    console.log("Expected size: " + expectedSize)
-    const fileSize = fs.statSync(updatePath).size
-    if (expectedSize && fileSize != expectedSize) {
-      try {
-        // Wrong file size, will try to delete
-        fs.unlinkSync(updatePath)
-      } catch (e) {
-        throw ("Couldn't delete update file. " + e)
-      }
-      console.log("Atempted to delete update file")
-      throw (`Update is wrong file size! Expected: ${expectedSize}. Got: ${fileSize}`)
-    }
-
-    /*
-    // For testing
-    latestVersion.show = true
-    latestVersion.error = true
-    sendToAllWindows('latest-version', latestVersion)
-    return false;
-    */
-
-    const { spawn } = require('child_process');
-    let process = spawn(updatePath, {
-      detached: true,
-      stdio: 'ignore'
-    });
-
-    // IDK, try again?
-    process.once("error", () => {
-      setTimeout(() => {
-        process = spawn(updatePath, {
-          detached: true,
-          stdio: 'ignore'
-        });
-      }, 1000)
-    })
-
-    process.unref()
-    app.quit()
-  } catch (e) {
-    console.log(e)
-    latestVersion.show = true
-    latestVersion.error = true
-    sendToAllWindows('latest-version', latestVersion)
-  }
-
-}
-
-ipcMain.on('check-for-updates', () => {
-  latestVersion.error = false
-  sendToAllWindows('latest-version', latestVersion)
-  checkForUpdates(true)
-})
-
-ipcMain.on('ignore-update', (event, dismissedUpdate) => {
-  writeSettings({ dismissedUpdate })
-  latestVersion.show = false
-  sendToAllWindows('latest-version', latestVersion)
-})
-
-ipcMain.on('clear-update', (event, dismissedUpdate) => {
-  latestVersion.show = false
-  sendToAllWindows('latest-version', latestVersion)
-})
 
 
 
@@ -5448,7 +5216,7 @@ function restartBackgroundUpdate() {
 
 
 // Idle detection
-let isUserIdle = false // Idle detection as defined by Twinkle Tray
+let isUserIdle = false // Idle detection as defined by BrightMon
 let userIdleInterval = false // Check if idle
 let userCheckingForActiveInterval = false // Check if came back
 let userIdleDimmed = false
@@ -5811,7 +5579,6 @@ function handleBackgroundUpdate(force = false) {
     console.error(e)
   }
 
-  if (!force) checkForUpdates(); // Ignore when forced update, since it should just be about fixing brightness.
 
   // GC
   setTimeout(() => {
@@ -5819,47 +5586,11 @@ function handleBackgroundUpdate(force = false) {
   }, 1000)
 }
 
-let lastCoordCheck = { value: { lat: 0, long: 0}, ts: 0 }
-async function getUserCoordinates() {
-  if(Date.now() - 10000 < lastCoordCheck.ts) return lastCoordCheck.value;
-  try {
-    if (isAppX === false) {
-      console.log("Getting geolocation...")
-      const response = await fetch("https://geo.twinkletray.com/")
-      if(response.status === 200) {
-        const coordinates = {
-          lat: response.headers.get("X-Geo-Lat"),
-          long: response.headers.get("X-Geo-Long")
-        }
-        if(typeof coordinates.lat === "string" && typeof coordinates.long === "string") {
-          console.log("Coordinates: ", coordinates)
-          lastCoordCheck.value = coordinates
-          lastCoordCheck.ts = Date.now()
-          return coordinates
-        }
-        throw("Couldn't get coordinates. Returned: " . JSON.stringify(coordinates))
-      }
-    }
-  } catch (e) {
-    console.log(e)
-  }
-}
-
-async function getAndApplyUserCoordinates() {
-  try {
-    const coordinates = await getUserCoordinates()
-    writeSettings({adjustmentTimeLongitude: coordinates.long, adjustmentTimeLatitude: coordinates.lat}, true, true)
-  } catch(e) {
-    console.log(e)
-  }
-}
-
-ipcMain.on('get-coordinates', getAndApplyUserCoordinates)
 
 /*
 
 Handle input from second process command line. One monitor argument and one brightness argument is required. Multiple arguments will override each other.
-Full example: TwinkleTray.exe --MonitorNum=1 --Offset=-30
+Full example: BrightMon.exe --MonitorNum=1 --Offset=-30
 
 Supported args:
 

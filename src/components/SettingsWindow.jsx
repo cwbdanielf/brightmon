@@ -12,7 +12,6 @@ import React, { PureComponent } from "react";
 import Titlebar from './Titlebar'
 import Slider from "./Slider";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
-import Markdown from 'markdown-to-jsx';
 import TranslateReact from "../TranslateReact"
 import MonitorInfo from "./MonitorInfo"
 import MonitorFeatures from "./MonitorFeatures"
@@ -136,13 +135,10 @@ export default class SettingsWindow extends PureComponent {
             linkedLevelsActive: false,
             updateInterval: (window.settings.updateInterval || 500),
             downloadingUpdate: false,
-            checkForUpdates: false,
             adjustmentTimeIndividualDisplays: false,
             languages: [],
-            analytics: false,
             useAcrylic: true,
             scrollShortcut: true,
-            updateProgress: 0,
             extendedDDCCI: {
                 contrast: 50,
                 volume: 50,
@@ -187,29 +183,6 @@ export default class SettingsWindow extends PureComponent {
         window.addEventListener("localizationUpdated", (e) => { this.setState({ languages: e.detail.languages });  T.setLocalizationData(e.detail.desired, e.detail.default)}); 
         window.addEventListener("windowHistory", e => this.setState({ windowHistory: e.detail }))
 
-        if (window.isAppX === false) {
-            window.addEventListener("updateUpdated", (e) => {
-                const version = e.detail
-                this.setState({
-                    releaseURL: (window.isAppX ? "ms-windows-store://pdp/?productid=9PLJWWSV01LK" : version.releaseURL),
-                    latest: version.version,
-                    downloadURL: version.downloadURL,
-                    changelog: version.changelog,
-                    error: (version.error != undefined ? version.error : false)
-                })
-                if (e.detail.error == true) {
-                    this.setState({
-                        downloadingUpdate: false
-                    })
-                }
-            })
-            window.addEventListener("updateProgress", (e) => {
-                this.setState({
-                    updateProgress: e.detail.progress
-                })
-            })
-            window.checkForUpdates()
-        }
         window.ipc.send('get-window-history')
         window.ipc.send("sendSettingsWindowPos")
         window.ipc.send('request-localization')
@@ -397,7 +370,7 @@ export default class SettingsWindow extends PureComponent {
             },
             {
                 id: "debug",
-                label: "Debug",
+                label: T.t("SETTINGS_SIDEBAR_DEBUG"),
                 icon: "&#xEBE8;",
                 type: "debug"
             }
@@ -425,42 +398,7 @@ export default class SettingsWindow extends PureComponent {
     }
 
 
-    getUpdate = () => {
-        if (window.isAppX) {
-            return (
-                <p><a onClick={() => { window.openURL("ms-store") }}>{T.t("SETTINGS_UPDATES_MS_STORE")}</a></p>
-            )
-        } else {
-            if (this.state.latest && this.state.latest != window.version) {
-                return (
-                    <div>
-                        <p><b style={{ color: window.accent }}>{T.t("SETTINGS_UPDATES_AVAILABLE") + ` (${this.state.latest})`}</b></p>
-                        <div className="changelog">
-                            <h3>{this.state.latest}</h3>
-                            <Markdown options={{ forceBlock: true }}>{this.state.changelog}</Markdown>
-                        </div>
-                        <br />
-                        {this.getUpdateButton()}
-                    </div>
-                )
-            } else if (this.state.latest) {
-                return (
-                    <div>
-                        <p>{T.t("SETTINGS_UPDATES_NONE_AVAILABLE")}</p>
-                        <div className="changelog"><Markdown options={{ forceBlock: true }}>{this.state.changelog}</Markdown></div>
-                    </div>
-                )
-            }
-        }
-    }
-
-    getUpdateButton = () => {
-        if (this.state.downloadingUpdate) {
-            return (<div><p><b>{T.t("SETTINGS_UPDATES_DOWNLOADING")}</b></p><div className="progress-bar"><div style={{ width: `${this.state.updateProgress}%` }}></div></div></div>)
-        } else {
-            return (<a className="button" onClick={() => { window.getUpdate(); this.setState({ downloadingUpdate: true }) }}><span className="icon red vfix" style={{ paddingRight: "6px", display: (this.state.error ? "inline" : "none") }}>&#xE783;</span>{T.t("SETTINGS_UPDATES_DOWNLOAD", this.state.latest)}</a>)
-        }
-    }
+    getUpdate = () => <p>{T.t("SETTINGS_UPDATES_PRIVATE_DESC")}</p>
 
     getMinMaxMonitors = () => {
         if (this.state.monitors == undefined || Object.keys(this.state.monitors).length == 0) {
@@ -517,11 +455,11 @@ export default class SettingsWindow extends PureComponent {
             pointsElems.push(
                 <div className="input-row" key={pointIdx}>
                     <div className="monitor-item">
-                        <label>Input</label>
+                        <label>{T.t("GENERIC_INPUT")}</label>
                         <Slider level={point.input} onChange={(value) => this.updateCalibrationPoint(monitorID, pointIdx, "input", value)} scrolling={false} height={"short"} />
                     </div>
                     <div className="monitor-item">
-                        <label>Output</label>
+                        <label>{T.t("GENERIC_OUTPUT")}</label>
                         <Slider level={point.output} onChange={(value) => this.updateCalibrationPoint(monitorID, pointIdx, "output", value)} scrolling={false} height={"short"} />
                     </div>
                     <div style={{ display: "flex", alignItems: "flex-end" }}>
@@ -865,7 +803,7 @@ export default class SettingsWindow extends PureComponent {
                         <div className="sectionSubtitle"><div className="icon">&#xE7F4;</div><div>{monitor.name}</div></div>
                         <p>{T.t("SETTINGS_MONITORS_DETAILS_NAME")}: <b>{getMonitorName(monitor, this.state.names)}</b>
                             <br />{T.t("SETTINGS_MONITORS_DETAILS_INTERNAL_NAME")}: <b>{monitor.hwid[1]}</b>
-                            <br />{T.t("SETTINGS_MONITORS_DETAILS_COMMUNICATION")}: {this.getDebugMonitorType((monitor.type === "ddcci" && monitor.highLevelSupported?.brightness ? "ddcci-hl" : monitor.type))}
+                            <br />{T.t("SETTINGS_MONITORS_DETAILS_COMMUNICATION")}: {this.getDebugMonitorType((monitor.type === "ddcci" && monitor.highLevelSupported?.brightness ? "ddcci-hl" : monitor.type), T)}
                             <br />{T.t("SETTINGS_MONITORS_DETAILS_BRIGHTNESS")}: <b>{(monitor.type == "none" ? T.t("GENERIC_NOT_SUPPORTED") : brightness)}</b>
                             <br />{T.t("SETTINGS_MONITORS_DETAILS_MAX_BRIGHTNESS")}: <b>{(monitor.type !== "ddcci" && monitor.type !== "software" ? T.t("GENERIC_NOT_SUPPORTED") : brightnessMax)}</b>
                             <br />{T.t("SETTINGS_MONITORS_DETAILS_BRIGHTNESS_NORMALIZATION")}: <b>{(monitor.type == "none" ? T.t("GENERIC_NOT_SUPPORTED") : monitor.min + " - " + monitor.max)}</b>
@@ -885,7 +823,7 @@ export default class SettingsWindow extends PureComponent {
             return Object.values(this.state.monitors).map((monitor, index) => {
 
                 return (
-                    <MonitorInfo key={monitor.key} name={getMonitorName(monitor, this.state.names)} monitor={monitor} debug={true} />
+                    <MonitorInfo key={monitor.key} name={getMonitorName(monitor, this.state.names)} monitor={monitor} debug={true} T={T} />
                 )
 
             })
@@ -1116,7 +1054,7 @@ export default class SettingsWindow extends PureComponent {
 
     getDebugMonitorType = (type) => {
         if (type == "none") {
-            return (<><b>None</b> <span className="icon red vfix">&#xEB90;</span></>)
+            return (<><b>{T.t("SETTINGS_MONITORS_TYPE_NONE")}</b> <span className="icon red vfix">&#xEB90;</span></>)
         } else if (type == "ddcci") {
             return (<><b>DDC/CI</b> <span className="icon green vfix">&#xE73D;</span></>)
         } else if (type == "ddcci-hl") {
@@ -1124,11 +1062,11 @@ export default class SettingsWindow extends PureComponent {
         } else if (type == "wmi") {
             return (<><b>WMI</b> <span className="icon green vfix">&#xE73D;</span></>)
         } else if (type == "software") {
-            return (<><b>Software (Gamma)</b> <span className="icon green vfix">&#xE73D;</span></>)
+            return (<><b>{T.t("SETTINGS_MONITORS_TYPE_SOFTWARE_GAMMA")}</b> <span className="icon green vfix">&#xE73D;</span></>)
         } else if (type == "studio-display") {
-            return (<><b>Studio Display</b> <span className="icon green vfix">&#xE73D;</span></>)
+            return (<><b>{T.t("SETTINGS_MONITORS_TYPE_STUDIO_DISPLAY")}</b> <span className="icon green vfix">&#xE73D;</span></>)
         } else {
-            return (<><b>Unknown ({type})</b> <span className="icon red vfix">&#xEB90;</span></>)
+            return (<><b>{T.t("SETTINGS_MONITORS_TYPE_UNKNOWN", type)}</b> <span className="icon red vfix">&#xEB90;</span></>)
         }
     }
 
@@ -1197,12 +1135,10 @@ export default class SettingsWindow extends PureComponent {
         const killWhenIdle = (settings.killWhenIdle || false)
         const order = (settings.order || [])
         const checkTimeAtStartup = (settings.checkTimeAtStartup || false)
-        const checkForUpdates = (settings.checkForUpdates || false)
         const adjustmentTimeIndividualDisplays = (settings.adjustmentTimeIndividualDisplays || false)
-        const language = (settings.language || "system")
+        const language = (settings.language || "pt-BR")
         const hotkeys = (settings.hotkeys || [])
         const hotkeyPercent = (settings.hotkeyPercent || 10)
-        const analytics = settings.analytics
         const useAcrylic = settings.useAcrylic
         const scrollShortcut = settings.scrollShortcut
         this.setState({
@@ -1217,12 +1153,10 @@ export default class SettingsWindow extends PureComponent {
             killWhenIdle,
             order,
             checkTimeAtStartup,
-            checkForUpdates,
             adjustmentTimeIndividualDisplays,
             language,
             hotkeys,
             hotkeyPercent,
-            analytics,
             useAcrylic,
             scrollShortcut
         }, () => {
@@ -1357,20 +1291,19 @@ export default class SettingsWindow extends PureComponent {
                                         </div>
                                     )} />
 
-                                    <SettingsOption title={T.t("SETTINGS_GENERAL_ANALYTICS_TITLE")} description={T.h("SETTINGS_GENERAL_ANALYTICS_DESC", '<a href="javascript:window.openURL(\'privacy-policy\')">' + T.t("SETTINGS_GENERAL_ANALYTICS_LINK") + '</a>')} input={this.renderToggle("analytics")} />
 
                                 </div>
 
                                 <div className="pageSection">
                                     <div className="sectionTitle">{T.t("SETTINGS_GENERAL_TROUBLESHOOTING")}</div>
 
-                                    <SettingsOption title={T.t("SETTINGS_GENERAL_DIS_MONITOR_FEATURES_TITLE")} description={T.h("SETTINGS_GENERAL_DIS_MONITOR_FEATURES_DESC", '<a href="javascript:window.openURL(\'troubleshooting-features\')">' + T.t("SETTINGS_GENERAL_ANALYTICS_LINK") + '</a>')} expandable={true}>
-                                        <SettingsChild title={"Apple Studio Displays"} input={this.renderToggle("disableAppleStudio", true, "right", true)} />
-                                        <SettingsChild title={"DDC/CI HL"} input={this.renderToggle("disableHighLevel", true, "right", true)} />
-                                        <SettingsChild title={"HDR"} input={this.renderToggle("disableHDR", true, "right", true)} />
-                                        <SettingsChild title={"WMIC"} input={this.renderToggle("disableWMIC", true, "right", true)} />
-                                        <SettingsChild title={"WMI-Bridge"} input={this.renderToggle("disableWMI", true, "right", true)} />
-                                        <SettingsChild title={"Win32-DisplayConfig"} input={this.renderToggle("disableWin32", true, "right", true)} />
+                                    <SettingsOption title={T.t("SETTINGS_GENERAL_DIS_MONITOR_FEATURES_TITLE")} description={T.t("SETTINGS_GENERAL_DIS_MONITOR_FEATURES_DESC", "")} expandable={true}>
+                                        <SettingsChild title={T.t("SETTINGS_DEBUG_APPLE_STUDIO")} input={this.renderToggle("disableAppleStudio", true, "right", true)} />
+                                        <SettingsChild title={T.t("SETTINGS_DEBUG_DDCCI_HL")} input={this.renderToggle("disableHighLevel", true, "right", true)} />
+                                        <SettingsChild title={T.t("SETTINGS_DEBUG_HDR")} input={this.renderToggle("disableHDR", true, "right", true)} />
+                                        <SettingsChild title={T.t("SETTINGS_DEBUG_WMIC")} input={this.renderToggle("disableWMIC", true, "right", true)} />
+                                        <SettingsChild title={T.t("SETTINGS_DEBUG_WMI_BRIDGE")} input={this.renderToggle("disableWMI", true, "right", true)} />
+                                        <SettingsChild title={T.t("SETTINGS_DEBUG_WIN32_DISPLAYCONFIG")} input={this.renderToggle("disableWin32", true, "right", true)} />
                                     </SettingsOption>
 
                                    <SettingsOption title={T.t("SETTINGS_GENERAL_LEGACY_DDC_TITLE")} description={T.t("SETTINGS_GENERAL_LEGACY_DDC_DESC")} input={
@@ -1434,8 +1367,6 @@ export default class SettingsWindow extends PureComponent {
                                                     <label style={{ "textTransform": "capitalize" }}>{T.t("SETTINGS_TIME_LONG")}</label>
                                                     <input type="number" min="-180" max="180" value={window.settings.adjustmentTimeLongitude * 1} onChange={(e) => this.setSetting("adjustmentTimeLongitude", e.target.value)} style={{width: "100%", boxSizing: "border-box"}} />
                                                 </div>
-                                                {/* I'll write better CSS later, I promise. */}
-                                                <div><label style={{opacity:0}}>Get {T.t("SETTINGS_TIME_SUN_GET")}</label><input type="button" className="button" onClick={() => window.ipc.send("get-coordinates")} value={T.t("SETTINGS_TIME_SUN_GET")} style={{lineHeight:"1.3",padding:(document.body.dataset.isWin11 === 'true' ? "9px" : "8px"),marginLeft:"6px"}} /></div>
                                             </div>
                                         </SettingsChild>
                                     </SettingsOption>
@@ -1653,97 +1584,88 @@ export default class SettingsWindow extends PureComponent {
                                     <p>{T.h("SETTINGS_UPDATES_VERSION", '<b>' + (window.version ? `${window.version}${window.versionTag && window.versionBuild ? ` (${window.versionBuild})` : ""}` : "not available") + '</b>')}</p>
                                     {this.getUpdate()}
                                 </div>
-                                <div className="pageSection" style={{ display: (window.isAppX ? "none" : (this.isSection("updates") ? "block" : "none")) }}>
-                                    <SettingsOption title={T.t("SETTINGS_UPDATES_AUTOMATIC_TITLE")} description={T.t("SETTINGS_UPDATES_AUTOMATIC_DESC")} input={this.renderToggle("checkForUpdates")} />
-                                    <SettingsOption title={T.t("SETTINGS_UPDATES_CHANNEL")} input={
-                                        <select value={this.state.rawSettings.branch} onChange={(e) => { window.sendSettings({ branch: e.target.value }) }}>
-                                            <option value="master">{T.t("SETTINGS_UPDATES_BRANCH_STABLE")}</option>
-                                            <option value="beta">{T.t("SETTINGS_UPDATES_BRANCH_BETA")}</option>
-                                        </select>
-                                    } />
-                                </div>
                             </SettingsPage>
 
                             <SettingsPage current={this.state.activePage} id="debug">
-    
+
 
                                 <div className="pageSection debug">
-                                    <SettingsOption title="All Displays" expandable={true} forceExpandable={true} input={<><a className="button" onClick={() => { window.requestMonitors(true) }}>Refresh Monitors</a> <a className="button" onClick={() => window.ipc.send('flush-vcp-cache')}>Clear Cache</a></>}>
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_ALL_DISPLAYS")} expandable={true} forceExpandable={true} input={<><a className="button" onClick={() => { window.requestMonitors(true) }}>{T.t("SETTINGS_DEBUG_REFRESH_MONITORS")}</a> <a className="button" onClick={() => window.ipc.send('flush-vcp-cache')}>{T.t("SETTINGS_DEBUG_CLEAR_CACHE")}</a></>}>
                                         <SettingsChild description={this.getDebugMonitors()} />
                                     </SettingsOption>
-                                    
-                                    <SettingsOption title="Save Report" description={"Save a text file with information about your monitors and settings for debugging."} input={<><a className="button" onClick={() => window.ipc.send('save-report')}>Generate Report</a></>} />
 
-                                    <SettingsOption title="Settings" description={window.settingsPath} input={<a className="button" onClick={() => window.ipc.send('open-settings-file')}>Open Settings</a>} expandable={true} forceExpandable={true}>
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_SAVE_REPORT")} description={T.t("SETTINGS_DEBUG_SAVE_REPORT_DESC")} input={<><a className="button" onClick={() => window.ipc.send('save-report')}>{T.t("SETTINGS_DEBUG_GENERATE_REPORT")}</a></>} />
+
+                                    <SettingsOption title={T.t("GENERIC_SETTINGS")} description={window.settingsPath} input={<a className="button" onClick={() => window.ipc.send('open-settings-file')}>{T.t("SETTINGS_DEBUG_OPEN_SETTINGS")}</a>} expandable={true} forceExpandable={true}>
                                         <SettingsChild>
                                             <p style={{ whiteSpace: "pre-wrap", fontFamily: '"Cascadia Code", "Consolas", sans-serif' }}>{JSON.stringify(this.state.rawSettings, undefined, 2)}</p>
                                         </SettingsChild>
-                                    </SettingsOption>     
-                                    
-                                    <SettingsOption title="Raw Monitor Data" expandable={true} forceExpandable={true}>
+                                    </SettingsOption>
+
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_RAW_MONITOR_DATA")} expandable={true} forceExpandable={true}>
                                         <SettingsChild>
                                             <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(window.allMonitors, undefined, 2)}</pre>
                                         </SettingsChild>
-                                    </SettingsOption>                               
+                                    </SettingsOption>
                                 </div>
 
                                 <div className="pageSection debug">
-                                    <div className="sectionTitle">Other</div>
-    
-                                    <SettingsOption title="Dev Mode" input={this.renderToggle("isDev")} />
-                                    <SettingsOption title="UDP Server" expandable={true}>
-                                        <SettingsChild title="Enable UDP server" input={this.renderToggle("udpEnabled")} />
-                                        <SettingsChild title="Enable UDP commands outside of localhost" input={this.renderToggle("udpRemote")} />
-                                        <SettingsChild title="Default port for UDP commands" input={<input type="number" min="1" max="65535" value={window.settings.udpPortStart * 1} onChange={(e) => this.setSetting("udpPortStart", e.target.value)} />} />
-                                        <SettingsChild title={`Active port: ${window.settings.udpPortActive}`} />
-                                        <SettingsChild title={`UDP key: ${window.settings.udpKey}`} />
+                                    <div className="sectionTitle">{T.t("GENERIC_OTHER")}</div>
+
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_DEV_MODE")} input={this.renderToggle("isDev")} />
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_UDP_SERVER")} expandable={true}>
+                                        <SettingsChild title={T.t("SETTINGS_DEBUG_ENABLE_UDP_SERVER")} input={this.renderToggle("udpEnabled")} />
+                                        <SettingsChild title={T.t("SETTINGS_DEBUG_ENABLE_REMOTE_UDP")} input={this.renderToggle("udpRemote")} />
+                                        <SettingsChild title={T.t("SETTINGS_DEBUG_UDP_DEFAULT_PORT")} input={<input type="number" min="1" max="65535" value={window.settings.udpPortStart * 1} onChange={(e) => this.setSetting("udpPortStart", e.target.value)} />} />
+                                        <SettingsChild title={T.t("SETTINGS_DEBUG_UDP_ACTIVE_PORT", window.settings.udpPortActive)} />
+                                        <SettingsChild title={T.t("SETTINGS_DEBUG_UDP_KEY", window.settings.udpKey)} />
                                     </SettingsOption>
-                                    
-                                    <SettingsOption title="DDC/CI Scanning Mode" description={`Last test result: ${settings?.lastDetectedDDCCIMethod}`} input={
+
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_DDC_SCANNING_MODE")} description={T.t("SETTINGS_DEBUG_LAST_TEST_RESULT", settings?.lastDetectedDDCCIMethod)} input={
                                         <select value={this.state.rawSettings.preferredDDCCIMethod} onChange={e => {
                                             window.sendSettings({ preferredDDCCIMethod: e.target.value })
                                         }}>
-                                            <option value="auto">Auto</option>
-                                            <option value="fast">Fast</option>
-                                            <option value="accurate">Accurate</option>
-                                            <option value="no-validation">No validation</option>
-                                            <option value="legacy">Legacy (v1.15.4 behavior)</option>
+                                            <option value="auto">{T.t("SETTINGS_DEBUG_AUTO")}</option>
+                                            <option value="fast">{T.t("SETTINGS_DEBUG_FAST")}</option>
+                                            <option value="accurate">{T.t("SETTINGS_DEBUG_ACCURATE")}</option>
+                                            <option value="no-validation">{T.t("SETTINGS_DEBUG_NO_VALIDATION")}</option>
+                                            <option value="legacy">{T.t("SETTINGS_DEBUG_LEGACY")}</option>
                                         </select>
                                     } />
 
-                                    {this.state.ddcSafetyStatus ? <SettingsOption title="DDC/CI safety mode is active" description={`A monitor worker stopped during ${this.state.ddcSafetyStatus.stage || "DDC/CI detection"}${this.state.ddcSafetyStatus.monitor ? ` for ${this.state.ddcSafetyStatus.monitor}` : ""}. Automatic detection is using the safer Fast method.`} input={<a className="button button-primary" onClick={() => window.retryDDCValidation()}>Retry Accurate Validation</a>} /> : null}
+                                    {this.state.ddcSafetyStatus ? <SettingsOption title={T.t("SETTINGS_DEBUG_DDC_SAFETY_ACTIVE")} description={T.t("SETTINGS_DEBUG_WORKER_STOPPED", this.state.ddcSafetyStatus.stage || T.t("SETTINGS_DEBUG_DDC_DETECTION"), this.state.ddcSafetyStatus.monitor ? T.t("SETTINGS_DEBUG_FOR_MONITOR", this.state.ddcSafetyStatus.monitor) : "")} input={<a className="button button-primary" onClick={() => window.retryDDCValidation()}>{T.t("SETTINGS_DEBUG_RETRY_ACCURATE")}</a>} /> : null}
 
-                                    <SettingsOption title="Gamma ramp fallback" description="Adjust brightness with the display's gamma ramp when no hardware brightness control (DDC/CI, WMI) is available. This dims the image instead of the backlight." input={this.renderToggle("useSoftwareBrightnessFallback")} />
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_GAMMA_FALLBACK")} description={T.t("SETTINGS_DEBUG_GAMMA_FALLBACK_DESC")} input={this.renderToggle("useSoftwareBrightnessFallback")} />
 
                                     <SettingsOption title={T.t("SETTINGS_MONITORS_HDR_DISPLAYS_TITLE")} description={T.t("SETTINGS_MONITORS_HDR_DISPLAYS_DESC")} expandable={true}>
                                         {this.getHDRMonitors()}
                                     </SettingsOption>
 
-                                    <SettingsOption title="Idle restore time" description="How long (in seconds) after going idle to rescan displays and apply last known brightness." input={<input type="number" min="0" max="60" value={this.state.rawSettings.idleRestoreSeconds * 1} onChange={(e) => this.setSetting("idleRestoreSeconds", e.target.value)} /> } />
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_IDLE_RESTORE_TITLE")} description={T.t("SETTINGS_DEBUG_IDLE_RESTORE_DESC")} input={<input type="number" min="0" max="60" value={this.state.rawSettings.idleRestoreSeconds * 1} onChange={(e) => this.setSetting("idleRestoreSeconds", e.target.value)} /> } />
 
-                                    <SettingsOption title="Wake restore time" description="How long (in seconds) after waking from sleep to rescan displays and apply last known brightness." input={<input type="number" min="0" max="60" value={this.state.rawSettings.wakeRestoreSeconds * 1} onChange={(e) => this.setSetting("wakeRestoreSeconds", e.target.value)} /> } />
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_WAKE_RESTORE_TITLE")} description={T.t("SETTINGS_DEBUG_WAKE_RESTORE_DESC")} input={<input type="number" min="0" max="60" value={this.state.rawSettings.wakeRestoreSeconds * 1} onChange={(e) => this.setSetting("wakeRestoreSeconds", e.target.value)} /> } />
 
-                                    <SettingsOption title="Hardware change time" description="How long (in seconds) after detecting a hardware change to rescan displays and apply last known brightness." input={<input type="number" min="0" max="60" value={this.state.rawSettings.hardwareRestoreSeconds * 1} onChange={(e) => this.setSetting("hardwareRestoreSeconds", e.target.value)} /> } />
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_HARDWARE_RESTORE_TITLE")} description={T.t("SETTINGS_DEBUG_HARDWARE_RESTORE_DESC")} input={<input type="number" min="0" max="60" value={this.state.rawSettings.hardwareRestoreSeconds * 1} onChange={(e) => this.setSetting("hardwareRestoreSeconds", e.target.value)} /> } />
 
-                                    <SettingsOption title="VCP read delay" description="How long (in miliseconds) to delay returning a VCP code value. This can help some displays not return random errors." input={<input type="number" min="0" max="200" value={this.state.rawSettings.checkVCPWaitMS * 1} onChange={(e) => this.setSetting("checkVCPWaitMS", e.target.value)} /> } />
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_VCP_READ_DELAY_TITLE")} description={T.t("SETTINGS_DEBUG_VCP_READ_DELAY_DESC")} input={<input type="number" min="0" max="200" value={this.state.rawSettings.checkVCPWaitMS * 1} onChange={(e) => this.setSetting("checkVCPWaitMS", e.target.value)} /> } />
 
-                                    <SettingsOption title="Flyout scroll amount" description="How large of steps to take when scrolling over a slider." input={<input type="number" min="1" max="10" value={this.state.rawSettings.scrollFlyoutAmount * 1} onChange={(e) => this.setSetting("scrollFlyoutAmount", e.target.value)} /> } />
-                                    
-                                    <SettingsOption title="Disable theme update detection" description="Prevent the app from detecting theme/wallpaper changes from Windows. This may help if a 3rd party app is frequently changing the theme, increasing CPU usage." input={this.renderToggle("disableThemeChanges")} />
-                                    <SettingsOption title="Restart app on wake" input={this.renderToggle("restartOnWake")} />
-                                    <SettingsOption title="Disable Auto Refresh" description="Prevent last known brightness from read after certain hardware/user events." input={this.renderToggle("disableAutoRefresh")} />
-                                    <SettingsOption title="Use Win32 hardware events" input={this.renderToggle("useWin32Event")} />
-                                    <SettingsOption title="Use Electron hardware events" input={this.renderToggle("useElectronEvents")} />
-                                    <SettingsOption title="Use WM_DISPLAYCHANGE events" input={this.renderToggle("useWmDisplayChangeEvent")} />
-                                    <SettingsOption title="Use SC_MONITORPOWER events" input={this.renderToggle("useScMonitorPowerEvent")} />
-                                    <SettingsOption title="Use GUID_SESSION_USER_PRESENCE events" input={this.renderToggle("useGuidPresenceEvent")} />
-                                    <SettingsOption title="Use GUID_VIDEO_CURRENT_MONITOR_BRIGHTNESS events" input={this.renderToggle("useGuidBrightnessEvent")} />
-                                    <SettingsOption title="Reload tray icon on hardware events" input={this.renderToggle("reloadTray")} />
-                                    <SettingsOption title="Reload flyout panel on hardware events" input={this.renderToggle("reloadFlyout")} />
-                                    <SettingsOption title="Save logs to file" description="Write a log file each session for troubleshooting. The last few sessions are kept in the app's data folder." input={this.renderToggle("logging")} />
-                                    <SettingsOption title="Show console window (requires restart)" input={this.renderToggle("showConsole")} />
-                                    <SettingsOption title="Use Taskbar Registry" input={this.renderToggle("useTaskbarRegistry")} />
-                                    <SettingsOption title="Disable Mouse Events (requires restart)" input={this.renderToggle("disableMouseEvents")} />
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_FLYOUT_SCROLL_TITLE")} description={T.t("SETTINGS_DEBUG_FLYOUT_SCROLL_DESC")} input={<input type="number" min="1" max="10" value={this.state.rawSettings.scrollFlyoutAmount * 1} onChange={(e) => this.setSetting("scrollFlyoutAmount", e.target.value)} /> } />
+
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_DISABLE_THEME_DETECTION")} description={T.t("SETTINGS_DEBUG_DISABLE_THEME_DETECTION_DESC")} input={this.renderToggle("disableThemeChanges")} />
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_RESTART_ON_WAKE")} input={this.renderToggle("restartOnWake")} />
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_DISABLE_AUTO_REFRESH")} description={T.t("SETTINGS_DEBUG_DISABLE_AUTO_REFRESH_DESC")} input={this.renderToggle("disableAutoRefresh")} />
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_USE_WIN32_EVENTS")} input={this.renderToggle("useWin32Event")} />
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_USE_ELECTRON_EVENTS")} input={this.renderToggle("useElectronEvents")} />
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_USE_DISPLAYCHANGE_EVENTS")} input={this.renderToggle("useWmDisplayChangeEvent")} />
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_USE_MONITORPOWER_EVENTS")} input={this.renderToggle("useScMonitorPowerEvent")} />
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_USE_USER_PRESENCE_EVENTS")} input={this.renderToggle("useGuidPresenceEvent")} />
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_USE_BRIGHTNESS_EVENTS")} input={this.renderToggle("useGuidBrightnessEvent")} />
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_RELOAD_TRAY")} input={this.renderToggle("reloadTray")} />
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_RELOAD_FLYOUT")} input={this.renderToggle("reloadFlyout")} />
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_SAVE_LOGS")} description={T.t("SETTINGS_DEBUG_SAVE_LOGS_DESC")} input={this.renderToggle("logging")} />
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_SHOW_CONSOLE")} input={this.renderToggle("showConsole")} />
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_USE_TASKBAR_REGISTRY")} input={this.renderToggle("useTaskbarRegistry")} />
+                                    <SettingsOption title={T.t("SETTINGS_DEBUG_DISABLE_MOUSE_EVENTS")} input={this.renderToggle("disableMouseEvents")} />
 
                                 </div>
                             </SettingsPage>
@@ -1775,8 +1697,8 @@ export default class SettingsWindow extends PureComponent {
                                 <p><b>{T.t("SETTINGS_FEATURES_ADD_EXISTS")}</b></p>
                             </div>
                             <div className="input-row flex-end">
-                                <input type="button" ref={this.addFeatureCancelRef} value={"Cancel"} className="button" onClick={() => this.setState({ showAddFeatureOverlay: false })} />
-                                <input type="button" ref={this.addFeatureOKRef} value={"OK"} className="button" onClick={() => {
+                                <input type="button" ref={this.addFeatureCancelRef} value={T.t("GENERIC_CANCEL")} className="button" onClick={() => this.setState({ showAddFeatureOverlay: false })} />
+                                <input type="button" ref={this.addFeatureOKRef} value={T.t("GENERIC_OK")} className="button" onClick={() => {
                                     let isActive = false
                                     const vcp = vcpStr(this.state.addFeatureValue)
                                     try {

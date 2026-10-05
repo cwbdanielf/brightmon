@@ -4,7 +4,7 @@ import TranslateReact from "../TranslateReact"
 import { displayLevel } from "./utilts/monitor.util"
 
 export default function MonitorInfo(props) {
-    const { monitor, name } = props
+    const { monitor, name, T = new TranslateReact({}, {}) } = props
     const [brightness, setBrightness] = useState(monitor?.features?.["0x10"] ? monitor?.features?.["0x10"][0] : 50)
     const [contrast, setContrast] = useState(monitor?.features?.["0x12"] ? monitor?.features?.["0x12"][0] : 50)
     const [volume, setVolume] = useState(monitor?.features?.["0x62"] ? monitor?.features?.["0x62"][0] : 50)
@@ -13,31 +13,22 @@ export default function MonitorInfo(props) {
     const [gamma, setGamma] = useState(monitor.gammaBrightness >= 0 ? monitor.gammaBrightness : 100)
     const [manualVCP, setManualVCP] = useState("")
     const [manualValue, setManualValue] = useState("")
-    const [T] = useState(new TranslateReact({}, {}))
-
     let extraHTML = []
 
     useEffect(() => {
-        window.addEventListener("localizationUpdated", (e) => T.setLocalizationData(e.detail.desired, e.detail.default))
-        window.ipc.send('request-localization')
-        return () => { }
-    }, [])
-
-    useEffect(() => {
         if (monitor.gammaBrightness >= 0) setGamma(monitor.gammaBrightness)
-        return () => { }
     }, [monitor.gammaBrightness])
 
     if (props.debug === true) {
         extraHTML.push(
             <div key="debug">
-                <br />Raw Brightness: <b>{(monitor.type == "none" ? "Not supported" : displayLevel(monitor.brightnessRaw))}</b>
-                <br />Features: <b>{(monitor.type == "ddcci" && monitor.features ? JSON.stringify(monitor.features) : "Unsupported")}</b>
-                <br />Order: <b>{(monitor.order ? monitor.order : "0")}</b>
-                <br />Key: <b>{monitor.key}</b>
-                <br />ID: <b>{monitor.id}</b>
-                <br />Connection Type: <b>{monitor.connector}</b>
-                <br />Gamma Level: <b>{getGammaLevel(monitor)}</b>
+                <br />{T.t("SETTINGS_MONITORS_RAW_BRIGHTNESS")}: <b>{(monitor.type == "none" ? T.t("GENERIC_NOT_SUPPORTED") : displayLevel(monitor.brightnessRaw))}</b>
+                <br />{T.t("SETTINGS_MONITORS_FEATURES")}: <b>{(monitor.type == "ddcci" && monitor.features ? JSON.stringify(monitor.features) : T.t("GENERIC_UNSUPPORTED"))}</b>
+                <br />{T.t("SETTINGS_MONITORS_ORDER")}: <b>{(monitor.order ? monitor.order : "0")}</b>
+                <br />{T.t("SETTINGS_MONITORS_KEY")}: <b>{monitor.key}</b>
+                <br />{T.t("SETTINGS_MONITORS_ID")}: <b>{monitor.id}</b>
+                <br />{T.t("SETTINGS_MONITORS_CONNECTION_TYPE")}: <b>{monitor.connector}</b>
+                <br />{T.t("SETTINGS_MONITORS_GAMMA_LEVEL")}: <b>{getGammaLevel(monitor, T)}</b>
                 <br /><br />
             </div>
         )
@@ -86,9 +77,9 @@ export default function MonitorInfo(props) {
     // Manual VCP
     extraHTML.push(
         <div className="manual-vcp-row" key="manual">
-            <input placeholder="VCP code" value={manualVCP} onChange={e => { setManualVCP(e.target.value) }} />
-            <input placeholder="Value" value={manualValue} onChange={e => { setManualValue(e.target.value) }} />
-            <a className="button" onClick={() => setVCP(monitor.id, parseInt(manualVCP), parseInt(manualValue))}>Send VCP</a>
+            <input placeholder={T.t("SETTINGS_MONITORS_VCP_CODE_PLACEHOLDER")} value={manualVCP} onChange={e => { setManualVCP(e.target.value) }} />
+            <input placeholder={T.t("SETTINGS_MONITORS_VALUE_PLACEHOLDER")} value={manualValue} onChange={e => { setManualValue(e.target.value) }} />
+            <a className="button" onClick={() => setVCP(monitor.id, parseInt(manualVCP), parseInt(manualValue))}>{T.t("SETTINGS_MONITORS_SEND_VCP")}</a>
         </div>
     )
 
@@ -116,7 +107,7 @@ export default function MonitorInfo(props) {
             <div className="sectionSubtitle"><div className="icon">&#xE7F4;</div><div>{monitor.name}</div></div>
             <p>{T.t("SETTINGS_MONITORS_DETAILS_NAME")}: <b>{name}</b>
                 <br />{T.t("SETTINGS_MONITORS_DETAILS_INTERNAL_NAME")}: <b>{monitor.hwid[1]}</b>
-                <br />{T.t("SETTINGS_MONITORS_DETAILS_COMMUNICATION")}: {getDebugMonitorType((monitor.type === "ddcci" && monitor.highLevelSupported?.brightness ? "ddcci-hl" : monitor.type))}
+                <br />{T.t("SETTINGS_MONITORS_DETAILS_COMMUNICATION")}: {getDebugMonitorType((monitor.type === "ddcci" && monitor.highLevelSupported?.brightness ? "ddcci-hl" : monitor.type), T)}
                 <br />{T.t("SETTINGS_MONITORS_DETAILS_BRIGHTNESS")}: <b>{(monitor.type == "none" ? T.t("GENERIC_NOT_SUPPORTED") : displayLevel(monitor.brightness))}</b>
                 <br />{T.t("SETTINGS_MONITORS_DETAILS_MAX_BRIGHTNESS")}: <b>{(monitor.type !== "ddcci" && monitor.type !== "software" ? T.t("GENERIC_NOT_SUPPORTED") : monitor.brightnessMax)}</b>
                 <br />{T.t("SETTINGS_MONITORS_DETAILS_BRIGHTNESS_NORMALIZATION")}: <b>{(monitor.type == "none" ? T.t("GENERIC_NOT_SUPPORTED") : monitor.min + " - " + monitor.max)}</b>
@@ -159,19 +150,19 @@ function gammaFeaturesActive() {
     return false
 }
 
-function getGammaLevel(monitor) {
+function getGammaLevel(monitor, T) {
     if (monitor.gammaBrightness >= 0) return displayLevel(monitor.gammaBrightness)
 
     // No device path means the ramp can't be reached at all
-    if (!(monitor.softwarePath || monitor.path)) return "Unsupported"
+    if (!(monitor.softwarePath || monitor.path)) return T.t("GENERIC_UNSUPPORTED")
 
     // Ramps are only read while a gamma feature is switched on
-    return (gammaFeaturesActive() ? "Read failed" : "Not read")
+    return (gammaFeaturesActive() ? T.t("SETTINGS_MONITORS_READ_FAILED") : T.t("SETTINGS_MONITORS_NOT_READ"))
 }
 
-function getDebugMonitorType(type) {
+function getDebugMonitorType(type, T) {
     if (type == "none") {
-        return (<><b>None</b> <span className="icon red vfix">&#xEB90;</span></>)
+        return (<><b>{T.t("SETTINGS_MONITORS_TYPE_NONE")}</b> <span className="icon red vfix">&#xEB90;</span></>)
     } else if (type == "ddcci") {
         return (<><b>DDC/CI</b> <span className="icon green vfix">&#xE73D;</span></>)
     } else if (type == "ddcci-hl") {
@@ -179,10 +170,10 @@ function getDebugMonitorType(type) {
     } else if (type == "wmi") {
         return (<><b>WMI</b> <span className="icon green vfix">&#xE73D;</span></>)
     } else if (type == "software") {
-        return (<><b>Software (Gamma)</b> <span className="icon green vfix">&#xE73D;</span></>)
+        return (<><b>{T.t("SETTINGS_MONITORS_TYPE_SOFTWARE_GAMMA")}</b> <span className="icon green vfix">&#xE73D;</span></>)
     } else if (type == "studio-display") {
-        return (<><b>Studio Display</b> <span className="icon green vfix">&#xE73D;</span></>)
+        return (<><b>{T.t("SETTINGS_MONITORS_TYPE_STUDIO_DISPLAY")}</b> <span className="icon green vfix">&#xE73D;</span></>)
     } else {
-        return (<><b>Unknown ({type})</b> <span className="icon red vfix">&#xEB90;</span></>)
+        return (<><b>{T.t("SETTINGS_MONITORS_TYPE_UNKNOWN", type)}</b> <span className="icon red vfix">&#xEB90;</span></>)
     }
 }
