@@ -1,0 +1,19 @@
+{
+  "manifest_version": "0.3",
+  "name": "brightmon",
+  "version": "1.2.0",
+  "description": "Control BrightMon monitor brightness from Claude Desktop. 100% local: talks to the running BrightMon app over a local pipe; no network.",
+  "author": {
+    "name": "BrightMon"
+  },
+  "server": {
+    "type": "node",
+    "entry_point": "BrightMonMcpServer.mjs",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/BrightMonMcpServer.mjs"
+      ]
+    }
+  }
+}

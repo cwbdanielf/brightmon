@@ -1,6 +1,6 @@
 {
   "name": "brightmon",
-  "version": "1.0.1",
+  "version": "1.2.0",
   "description": "Manage the brightness of monitors from your system tray",
   "main": "src/electron.js",
   "scripts": {
@@ -17,8 +17,10 @@
     "arm64": "npm run parcel-build && electron-builder --arm64 -c.extraMetadata.name=twinkle-tray-arm64 -c.win.artifactName=\"${productName} v${version}-arm64.${ext}\" -c.win.compression=normal",
     "rebuild-ddcci-dev": "npm rebuild @hensm/ddcci",
     "appx-arm64": "npm run parcel-build && electron-builder --arm64 -w appx -c.extraMetadata.name=twinkle-tray-appx -c.win.artifactName=\"${productName} v${version}-store-arm64.${ext}\"",
-    "build": "npm ci & npm run parcel-build && npm run electron-build",
+    "build": "npm ci & npm run parcel-build && npm run mcp:build && npm run electron-build",
     "build-all": "npm run build && npm run appx && npm run appx-arm64",
+    "mcp:build": "node mcp/build-mcpb.js",
+    "test:mcp": "node --test --test-concurrency=1 \"tests/mcp/*.test.js\"",
     "test-wmibridge": "node src/modules/wmi-bridge/example.js"
   },
   "keywords": [
@@ -42,8 +44,8 @@
     "suncalc": "^1.9.0",
     "tt-windows-utils": "file:src/modules/tt-windows-utils",
     "win32-displayconfig": "file:src/modules/win32-displayconfig",
-    "windows-ambient-sensor": "file:src/modules/windows-ambient-sensor",
     "windows-accent-colors": "^1.0.2",
+    "windows-ambient-sensor": "file:src/modules/windows-ambient-sensor",
     "windows-hdr": "file:src/modules/windows-hdr",
     "wmi-bridge": "file:src/modules/wmi-bridge",
     "wmi-client": "^0.5.0",
@@ -56,8 +58,11 @@
     "productName": "BrightMon",
     "appId": "com.brightmon.desktop",
     "compression": "normal",
-    "electronLanguages": ["en-US"],
+    "electronLanguages": [
+      "en-US"
+    ],
     "afterPack": "resources/afterPack.js",
+    "beforePack": "resources/beforePack.js",
     "directories": {
       "buildResources": "resources"
     },
@@ -73,6 +78,8 @@
       "src/Utils.js",
       "src/Logger.js",
       "src/Monitors.js",
+      "src/mcp/mcpCommon.js",
+      "src/mcp/mcpPipeServer.js",
       "src/wmi-bridge-test.js",
       "src/vcp-codes.js",
       "src/assets/tray-icons/dark/*.ico",
@@ -163,6 +170,12 @@
       "node_modules/usb/prebuilds/${platform}-${arch}/*"
     ],
     "asar": true,
+    "extraResources": [
+      {
+        "from": "artifacts/mcp/BrightMonMcpServer.mjs",
+        "to": "mcp/BrightMonMcpServer.mjs"
+      }
+    ],
     "asarUnpack": [
       "node_modules\\wmi-client\\**\\*",
       "node_modules\\sharp\\**\\*",
@@ -204,17 +217,20 @@
     "@babel/preset-env": "^7.23.6",
     "@babel/preset-react": "^7.23.3",
     "@babel/runtime": "^7.23.6",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "bindings": "1.5.0",
     "cross-env": "^7.0.3",
     "electron": "^43.4.0",
     "electron-builder": "26.3.2",
+    "esbuild": "^0.28.2",
     "node-addon-api": "^8.2.2",
     "node-gyp": "^12.1.0",
     "parcel-bundler": "^1.12.5",
     "react": "18.3.1",
     "react-beautiful-dnd": "^13.1.1",
     "react-dom": "18.3.1",
-    "sass": "^1.54.0"
+    "sass": "^1.54.0",
+    "zod": "^4.6.5"
   },
   "overrides": {
     "node-gyp": "$node-gyp",

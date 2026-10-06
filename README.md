@@ -2,13 +2,14 @@
 
 **BrightMon** é um aplicativo para Windows que permite ajustar o brilho de monitores compatíveis pela bandeja do sistema. Este repositório contém uma versão derivada do [Twinkle Tray](https://github.com/xanderfrangos/twinkle-tray), com identidade e configuração localizadas para BrightMon. O upstream é citado como origem do projeto; este repositório não é o canal oficial de downloads do Twinkle Tray.
 
-> **Versão neste checkout:** 1.0.1. Os instaladores e arquivos gerados localmente ficam em `dist/`; não há um endereço público de download do BrightMon especificado neste README.
+> **Versão neste checkout:** 1.2.0. Os instaladores e arquivos gerados localmente ficam em `dist/`; não há um endereço público de download do BrightMon especificado neste README.
 
 ## Recursos
 
 - Ajuste de brilho pela janela flutuante da bandeja do Windows.
 - Controle por monitor compatível via DDC/CI e, quando disponível, por caminhos específicos do Windows para telas internas.
 - Controles de recursos DDC/CI informados pelo monitor, que podem incluir contraste, volume, entrada e estado de energia.
+- Controle por MCP local: assistentes de IA rodando no mesmo computador (como o Claude Desktop) podem listar monitores, ajustar o brilho e desligar telas compatíveis — opt-in, sem exposição em rede.
 - Ajustes por horário, detecção de inatividade, teclas de atalho e perfis de aplicativos.
 - Normalização e calibração do brilho entre monitores, além de opções para telas HDR e controle por gama/software em hardware compatível.
 - Sensor de luz ambiente do Windows, sensor Yocto ou sensor simulado.
@@ -28,6 +29,22 @@ A disponibilidade varia conforme o monitor, o driver, a conexão e os recursos i
 ### Detecção e controle de monitores
 
 O worker combina APIs do Windows e bibliotecas nativas conforme o equipamento disponível. DDC/CI/VCP é usado para monitores externos compatíveis; WMI/WMI Bridge e APIs de configuração de vídeo do Windows cobrem outros casos. Há também caminhos específicos para HDR, Apple Studio Display e ajuste de gama por software. Nenhum caminho garante suporte universal: o aplicativo pode mostrar capacidades diferentes para cada monitor ou conexão.
+
+### Controle por MCP local (assistentes de IA)
+
+A opção **MCP local** fica em Configurações → Geral e está desativada por padrão; enquanto estiver desligada, nada fica escutando. Ao ativá-la, o processo principal do Electron abre um named pipe local (`\\.\pipe\BrightMon-MCP-…`) protegido por um token gravado em `%LOCALAPPDATA%\BrightMon\mcp.json`. O cliente MCP é um servidor `stdio` separado, iniciado pelo próprio assistente, que encaminha cada chamada ao pipe — nenhuma porta de rede é aberta e nada sai do computador.
+
+Ferramentas expostas (somente essas três, sem comandos genéricos):
+
+- `list_displays` — id opaco, nome, posição atual na UI, brilho conhecido e capacidades (ajustável/energia/oculto), sem seriais ou HWIDs.
+- `set_brightness` — um id exato e um número 0–100; reutiliza o pipeline completo de brilho (calibração, HDR/gama, WMI, DDC/CI).
+- `turn_off_display` — uma tela por vez, apenas quando o monitor expõe o recurso DDC/CI de energia (VCP 0xD6 habilitado para o monitor); nunca alterna nem afeta outras telas.
+
+Alvos são resolvidos por igualdade exata contra o inventário atual; “monitor 1” só resolve quando a posição for inequívoca. As respostas indicam comando aceito/enviado e não confirmam o estado físico do hardware — o worker não retorna confirmação de escrita.
+
+Para conectar o Claude Desktop, use o bloco de configuração copiável em Configurações → Geral → MCP local (em `claude_desktop_config.json`) ou gere e instale a extensão `artifacts\BrightMon.mcpb` pelo menu Settings → Extensions → Install Extension do Claude Desktop.
+
+Arquivos principais: [`src/mcp/`](src/mcp/) (lógica compartilhada e servidor do pipe usados pelo processo principal), [`mcp/`](mcp/) (servidor `stdio`, manifest e build da extensão) e [`tests/mcp/`](tests/mcp/).
 
 ### Localização
 
@@ -55,12 +72,14 @@ Scripts adicionais definidos em [`package.json`](package.json):
 
 | Comando | Resultado |
 | --- | --- |
-| `npm run build` | Instala as dependências com `npm ci`, compila a interface e gera o instalador x64. |
+| `npm run build` | Instala as dependências com `npm ci`, compila a interface, gera o bundle MCP e o instalador x64. |
 | `npm run portable` | Compila a interface e gera um pacote ZIP portátil x64. |
 | `npm run appx` | Compila a interface e tenta gerar o pacote AppX x64. |
 | `npm run appx-arm64` | Compila a interface e tenta gerar o pacote AppX ARM64. |
 | `npm run arm64` | Compila a interface e gera um pacote ZIP ARM64. |
 | `npm run build-all` | Executa o build padrão, AppX x64 e AppX ARM64. |
+| `npm run mcp:build` | Gera o bundle do servidor MCP em `artifacts/mcp/` e a extensão `artifacts/BrightMon.mcpb`. |
+| `npm run test:mcp` | Executa os testes do módulo MCP (lógica, servidor de pipe e E2E `stdio`). |
 | `npm run test-wmibridge` | Executa o exemplo de teste do WMI Bridge. |
 | `npm run parcel` | Inicia o servidor Parcel para desenvolvimento da interface. |
 | `npm start` | Abre o aplicativo com Electron em modo de desenvolvimento. |

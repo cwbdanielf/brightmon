@@ -76,6 +76,10 @@ function requestDDCSafetyStatus() {
     ipc.send('request-ddc-safety-status')
 }
 
+function requestMcpStatus() {
+    ipc.send('request-mcp-status')
+}
+
 function retryDDCValidation() {
     ipc.send('retry-ddc-validation')
 }
@@ -157,6 +161,13 @@ ipc.on('native-brightness-key', (event, accelerator) => {
 
 ipc.on('ddc-safety-status', (event, status) => {
     window.dispatchEvent(new CustomEvent('ddcSafetyStatus', {
+        detail: status
+    }))
+})
+
+// Local MCP pipe server status (running/stopped/error + config block)
+ipc.on('mcp-status', (event, status) => {
+    window.dispatchEvent(new CustomEvent('mcpStatus', {
         detail: status
     }))
 })
@@ -258,6 +269,9 @@ window.requestSettings = requestSettings
 window.resetSettings = resetSettings
 window.requestDDCSafetyStatus = requestDDCSafetyStatus
 window.retryDDCValidation = retryDDCValidation
+window.requestMcpStatus = requestMcpStatus
+// Settings window runs with nodeIntegration, so the clipboard is available.
+window.copyToClipboard = (text) => require('electron').clipboard.writeText(text)
 window.openURL = openURL
 window.allMonitors = []
 window.lastUpdate = Date.now()

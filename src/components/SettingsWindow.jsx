@@ -149,7 +149,9 @@ export default class SettingsWindow extends PureComponent {
             addFeatureMonitor: "",
             addFeatureValue: "",
             addFeatureError: false,
-            ddcSafetyStatus: false
+            ddcSafetyStatus: false,
+            mcpStatus: { status: "stopped", error: null, config: null, since: 0 },
+            mcpCopied: false
         }
         this.numMonitors = 0
         this.downKeys = {}
@@ -179,14 +181,16 @@ export default class SettingsWindow extends PureComponent {
         window.addEventListener("monitorsUpdated", this.recievedMonitors)
         window.addEventListener("settingsUpdated", this.recievedSettings)
         window.addEventListener("ddcSafetyStatus", this.recievedDDCSafetyStatus)
+        window.addEventListener("mcpStatus", this.recievedMcpStatus)
         window.addEventListener("nativeBrightnessKey", this.recievedNativeBrightnessKey)
-        window.addEventListener("localizationUpdated", (e) => { this.setState({ languages: e.detail.languages });  T.setLocalizationData(e.detail.desired, e.detail.default)}); 
+        window.addEventListener("localizationUpdated", (e) => { this.setState({ languages: e.detail.languages });  T.setLocalizationData(e.detail.desired, e.detail.default)});
         window.addEventListener("windowHistory", e => this.setState({ windowHistory: e.detail }))
 
         window.ipc.send('get-window-history')
         window.ipc.send("sendSettingsWindowPos")
         window.ipc.send('request-localization')
         window.requestDDCSafetyStatus()
+        window.requestMcpStatus()
         window.reactReady = true
     }
 
@@ -1168,6 +1172,32 @@ export default class SettingsWindow extends PureComponent {
         this.setState({ ddcSafetyStatus: e.detail || false })
     }
 
+    recievedMcpStatus = (e) => {
+        this.setState({ mcpStatus: e.detail || { status: "stopped", error: null, config: null, since: 0 } })
+    }
+
+    getMcpStatusText = () => {
+        const status = this.state.mcpStatus?.status || "stopped"
+        if (status === "running") return T.t("SETTINGS_MCP_STATUS_RUNNING")
+        if (status === "starting") return T.t("SETTINGS_MCP_STATUS_STARTING")
+        if (status === "error") {
+            return T.t("SETTINGS_MCP_STATUS_ERROR", this.state.mcpStatus?.error || "")
+        }
+        return T.t("SETTINGS_MCP_STATUS_STOPPED")
+    }
+
+    copyMcpConfig = () => {
+        const config = this.state.mcpStatus?.config
+        if (!config) return
+        try {
+            window.copyToClipboard(JSON.stringify({ mcpServers: { brightmon: config } }, null, 2))
+            this.setState({ mcpCopied: true })
+            setTimeout(() => this.setState({ mcpCopied: false }), 2000)
+        } catch (e) {
+            console.log("Couldn't copy MCP config", e)
+        }
+    }
+
 
     isSection = (name) => {
         if (this.state.activePage == name) {
@@ -1344,6 +1374,28 @@ export default class SettingsWindow extends PureComponent {
                                     <SettingsOption title={T.t("SETTINGS_GENERAL_RESET_TITLE")} description={T.t("SETTINGS_GENERAL_RESET_DESC")} input={<a className="button" onClick={window.resetSettings}>{T.t("SETTINGS_GENERAL_RESET_BUTTON")}</a>} />
 
                                 </div>
+
+                                <div className="pageSection">
+                                    <div className="sectionTitle">{T.t("SETTINGS_MCP_TITLE")}</div>
+                                    <p>{T.t("SETTINGS_MCP_INTRO")}</p>
+
+                                    <SettingsOption title={T.t("SETTINGS_MCP_TOGGLE")} description={T.t("SETTINGS_MCP_DESC")} input={this.renderToggle("mcpEnabled")} />
+
+                                    <SettingsOption title={T.t("SETTINGS_MCP_STATUS")} description={this.getMcpStatusText()} />
+
+                                    <SettingsOption title={T.t("SETTINGS_MCP_CONFIG_TITLE")} description={T.t("SETTINGS_MCP_CONFIG_DESC")} expandable={true} forceExpandable={true}>
+                                        {this.state.mcpStatus?.config?.warning === "script_missing"
+                                            ? <p><b>{T.t("SETTINGS_MCP_SCRIPT_MISSING")}</b></p>
+                                            : null}
+                                        <p>
+                                            <a className="button button-primary" onClick={this.copyMcpConfig}>{(this.state.mcpCopied ? T.t("SETTINGS_MCP_COPIED") : T.t("SETTINGS_MCP_COPY"))}</a>
+                                        </p>
+                                        <pre style={{ whiteSpace: "pre-wrap", fontFamily: '"Cascadia Code", "Consolas", sans-serif' }}>{JSON.stringify({ mcpServers: { brightmon: this.state.mcpStatus?.config } }, null, 2)}</pre>
+                                    </SettingsOption>
+
+                                    <SettingsOption title={T.t("SETTINGS_MCP_EXT_TITLE")} description={T.t("SETTINGS_MCP_EXT_DESC")} />
+                                </div>
+
                             </SettingsPage>
 
                             <SettingsPage current={this.state.activePage} id="time">

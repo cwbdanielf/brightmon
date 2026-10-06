@@ -19,6 +19,8 @@ const isPortable = (app.name == "twinkle-tray-portable" ? true : false)
 
 const Utils = require("./Utils")
 const logger = require("./Logger")
+const mcpCommon = require("./mcp/mcpCommon.js")
+const { createMcpPipeServer } = require("./mcp/mcpPipeServer.js")
 
 const configFilesDir = (isPortable ? path.join(__dirname, "../../config/") : app.getPath("userData"))
 const settingsPath = path.join(configFilesDir, `\\settings${(isDev ? "-dev" : "")}.json`)
@@ -285,6 +287,9 @@ app.on('before-quit', () => {
     clearTimeout(monitorInventoryRecoveryTimer)
     monitorInventoryRecoveryTimer = false
   }
+  // Close the MCP pipe and remove its token file so clients see a clean
+  // "not running" instead of a stale endpoint.
+  if (mcpPipe) mcpPipe.stop()
 })
 
 function getDDCSafetyStatus() {
@@ -304,6 +309,35 @@ function sendDDCSafetyStatus(target = false) {
     sendToAllWindows("ddc-safety-status", status)
   }
   return status
+}
+
+// Runtime state for the local MCP pipe server (never persisted; the
+// persisted part is only settings.mcpEnabled).
+let mcpPipe = false
+let mcpStatusData = { status: "stopped", error: null, config: null, since: Date.now() }
+
+// Where Claude Desktop's Node finds the bundled stdio server. Packaged runs
+// get it via extraResources (real file — plain `node` cannot read inside
+// app.asar); dev runs point at the repo build output.
+function getMcpConfig() {
+  const scriptPath = isDev
+    ? path.join(app.getAppPath(), "artifacts", "mcp", "BrightMonMcpServer.mjs")
+    : path.join(process.resourcesPath, "mcp", "BrightMonMcpServer.mjs")
+  return {
+    command: "node",
+    args: [scriptPath],
+    warning: (fs.existsSync(scriptPath) ? null : "script_missing")
+  }
+}
+
+function sendMcpStatus(target = false) {
+  mcpStatusData = Object.assign({}, mcpStatusData, { config: getMcpConfig() })
+  if (target && !target.isDestroyed()) {
+    target.send("mcp-status", mcpStatusData)
+  } else {
+    sendToAllWindows("mcp-status", mcpStatusData)
+  }
+  return mcpStatusData
 }
 
 function clearDDCSafetyStatus() {
@@ -933,6 +967,7 @@ const defaultSettings = {
   udpPortStart: 14715,
   udpPortActive: 14715,
   udpKey: uuid(),
+  mcpEnabled: false,
   showConsole: false,
   logging: true,
   profiles: [],
@@ -1291,6 +1326,18 @@ function processSettings(newSettings = {}, sendUpdate = true) {
       if (!udp.server) udp.start(settings.udpPort);
     } else if (settings.udpEnabled === false) {
       if (udp.server) udp.stop();
+    }
+
+    // Local MCP pipe: idempotent, keyed on the persisted preference so that
+    // processSettings({}) (getSettings / panel open) also reconciles state.
+    // Reads settings.* rather than newSettings.* on purpose.
+    if (app.isReady() && mcpPipe) {
+      if (settings.mcpEnabled === true) {
+        const mcpState = mcpPipe.getStatus().status
+        if (mcpState === "stopped" || mcpState === "error") mcpPipe.start()
+      } else if (settings.mcpEnabled === false) {
+        mcpPipe.stop()
+      }
     }
 
     if (newSettings.logging !== undefined) {
@@ -2319,6 +2366,10 @@ ipcMain.on('send-settings', (event, data) => {
 
 ipcMain.on('request-ddc-safety-status', event => {
   sendDDCSafetyStatus(event.sender)
+})
+
+ipcMain.on('request-mcp-status', event => {
+  sendMcpStatus(event.sender)
 })
 
 ipcMain.on('retry-ddc-validation', () => {
@@ -4430,6 +4481,10 @@ app.on("ready", async () => {
   showIntro()
   createPanel(false, true)
 
+  // Start the local MCP pipe if it was enabled last session (module-load
+  // readSettings runs with processing disabled, so do it once app is ready).
+  if (mcpPipe && settings.mcpEnabled === true) mcpPipe.start()
+
   await doWMIBridgeTest()
   startMonitorThread()
   monitorsThread.once("ready", async () => {
@@ -6123,3 +6178,94 @@ const pipe = {
 }
 
 pipe.start()
+
+
+//
+//
+//  Local MCP Pipe Server (opt-in via settings.mcpEnabled)
+//
+//
+
+// Allowlisted operations only. Every target is resolved against the current
+// inventory with exact-id semantics (src/mcp/mcpCommon.js); nothing here
+// exposes serials, raw HWIDs or arbitrary VCP writes.
+async function mcpDispatch(op, params) {
+  const deps = { settings, usesGammaSlider }
+
+  if (op === "list_displays") {
+    const sorted = mcpCommon.sortUiOrder(Object.values(monitors || {}))
+    return {
+      displays: sorted.map((monitor, index) => mcpCommon.buildDisplaySummary(monitor, index + 1, deps)),
+      notes: [
+        "brightness is BrightMon's last known value; it is not re-read from hardware",
+        "id is an opaque handle — pass it back exactly as given",
+        "uiIndex follows the current panel order and can change after displays are re-enumerated"
+      ]
+    }
+  }
+
+  if (op === "set_brightness") {
+    if (!mcpCommon.validateBrightness(params.brightness)) {
+      throw mcpCommon.makeError(mcpCommon.ERRORS.INVALID_PARAMS,
+        "brightness must be a JSON number between 0 and 100 (strings are not accepted)")
+    }
+    const resolved = mcpCommon.resolveDisplay(monitors, params.id, deps)
+    if (resolved.error) throw resolved.error
+    const monitor = resolved.monitor
+    if (mcpCommon.isHidden(monitor, settings)) {
+      throw mcpCommon.makeError(mcpCommon.ERRORS.DISPLAY_HIDDEN, "Display is hidden in BrightMon")
+    }
+    if (!mcpCommon.canAdjust(monitor, deps)) {
+      throw mcpCommon.makeError(mcpCommon.ERRORS.NOT_ADJUSTABLE, "Display has no brightness control")
+    }
+    setRecentlyInteracted(true)
+    const result = updateBrightness(monitor.id, params.brightness)
+    if (result === false) {
+      throw mcpCommon.makeError(mcpCommon.ERRORS.REJECTED,
+        "BrightMon rejected the update (display idle/hidden by rules or invalid level)")
+    }
+    return {
+      status: "accepted",
+      id: monitor.id,
+      requestedBrightness: params.brightness,
+      verified: false,
+      note: "Queued through BrightMon's brightness pipeline (calibration/HDR/gamma/WMI/DDC). Not hardware-verified — BrightMon's worker does not return an ACK."
+    }
+  }
+
+  if (op === "turn_off_display") {
+    const resolved = mcpCommon.resolveDisplay(monitors, params.id, deps)
+    if (resolved.error) throw resolved.error
+    const monitor = resolved.monitor
+    if (mcpCommon.isHidden(monitor, settings)) {
+      throw mcpCommon.makeError(mcpCommon.ERRORS.DISPLAY_HIDDEN, "Display is hidden in BrightMon")
+    }
+    if (!mcpCommon.canTurnOff(monitor, settings)) {
+      throw mcpCommon.makeError(mcpCommon.ERRORS.NO_POWER_CAPABILITY,
+        "Display does not expose DDC/CI power control (VCP 0xD6) — enable it in the display's BrightMon settings if supported")
+    }
+    setRecentlyInteracted(true)
+    // toggle=false: an explicit off command. Never the toggle variant (it
+    // could switch an already-off display back on) and never the global
+    // Windows sleep path, which affects every display.
+    await turnOffDisplayDDC(monitor.hwid.join("#"), false)
+    return {
+      status: "command_sent",
+      id: monitor.id,
+      capability: "ddc-ci power (VCP 0xD6)",
+      verified: false,
+      note: "DDC power-off command was sent (non-toggle). The worker discards write results, so the display being off is NOT confirmed."
+    }
+  }
+
+  throw mcpCommon.makeError(mcpCommon.ERRORS.UNKNOWN_OP, `Unknown operation "${op}"`)
+}
+
+mcpPipe = createMcpPipeServer({
+  dispatch: mcpDispatch,
+  onStatusChange: (state) => {
+    mcpStatusData = Object.assign({}, mcpStatusData, state)
+    sendMcpStatus()
+  },
+  log: (...args) => console.log(...args)
+})
