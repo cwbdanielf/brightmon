@@ -63,6 +63,10 @@
     ],
     "afterPack": "resources/afterPack.js",
     "beforePack": "resources/beforePack.js",
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
+    },
     "directories": {
       "buildResources": "resources"
     },
